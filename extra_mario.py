@@ -3,6 +3,8 @@ import pygame
 import os
 from glob import glob
 import pygame.mixer
+import time
+import math
 
 
 def load_image(name, colorkey=None):
@@ -19,6 +21,7 @@ def load_image(name, colorkey=None):
 
 class Game:
     def __init__(self, width=650, height=550):
+        pygame.mixer.pre_init(44100, 16, 2, 4096)
         pygame.init()
         pygame.mixer.init()
         self.width = width
@@ -35,6 +38,7 @@ class Game:
         self.key = False
         self.extra_life = False
         self.coin_counter = 0
+        self.game_time = 0
         pygame.mixer.music.load('data/main_sounds.mp3')
         pygame.mixer.music.play(-1)
         pygame.mixer.music.set_volume(0.05)
@@ -105,17 +109,15 @@ class Game:
     def lose(self):
         self.render_lvl()
         running = True
-        v = 200
+        v = 300
         clock = pygame.time.Clock()
         pause = 1000
         timer = 0
-        x_cord = -300
+        pygame.mixer.music.load('data/mario_death.mp3')
+        pygame.mixer.music.play()
+        x_cord = -600
         y_cord = 0
-        #pygame.mixer.music.load('data/mario_death.mp3')
-        #pygame.mixer.music.play()
-        p = os.path.abspath('data/test.wav')
-        sound = pygame.mixer.Sound(p)
-        image = load_image('gameover2(small).png')
+        image = load_image('big_gameover2(small).png')
         self.screen.blit(image, (x_cord, y_cord))
         while running:
             for event in pygame.event.get():
@@ -134,30 +136,57 @@ class Game:
 
     def win(self):
         running = True
-        v = 200
+        v = 300
         clock = pygame.time.Clock()
-        x_cord = -300
+        x_cord = -600
         y_cord = 0
-        image = load_image('win.png')
+        image = load_image('big_win.png')
         self.screen.blit(image, (x_cord, y_cord))
         pygame.mixer.music.load('data/win_sounds.mp3')
         pygame.mixer.music.play()
+        draw_count = True
+        self.game_time = math.ceil(self.game_time)
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-            if x_cord <= 0:
-                x_cord += (v * clock.tick() / 1000)
-                self.screen.blit(image, (int(x_cord), y_cord))
-            else:
-                x_cord = 0
-                self.screen.blit(image, (int(x_cord), y_cord))
-                self.all_sprites.empty()
-                self.tiles_group.empty()
-                self.player_group.empty()
+            if draw_count:
+                if x_cord <= 0:
+                    x_cord += (v * clock.tick() / 1000)
+                    self.screen.blit(image, (int(x_cord), y_cord))
+                else:
+                    minute = self.game_time // 60
+                    secund = self.game_time % 60
+                    if minute % 10 == 1 and minute % 100 != 11:
+                        minute_teg = 'минуту'
+                    elif minute % 10 in [2, 3, 4] and minute % 100 not in [12, 13, 14]:
+                        minute_teg = 'минуты'
+                    else:
+                        minute_teg = 'минут'
+
+                    if secund % 10 == 1 and secund % 100 != 11:
+                        second_teg = 'секунду'
+                    elif secund % 10 in [2, 3, 4] and secund % 100 not in [12, 13, 14]:
+                        second_teg = 'секунды'
+                    else:
+                        second_teg = 'секунд'
+                    font = pygame.font.Font(None, 50)
+                    text = font.render(str(self.coin_counter) + "/10 Монет собранно", 1, (255, 215, 0))
+                    if minute > 0:
+                        text_time = font.render('За {} {} и {} {}'.format(minute, minute_teg, secund, second_teg), 1, (255, 215, 0))
+                    else:
+                        text_time = font.render('За {} {}'.format(secund, second_teg), 1, (255, 215, 0))
+                    self.screen.blit(text, (120, 400))
+                    self.screen.blit(text_time, (130, 450))
+                    draw_count = False
+                    x_cord = 0
+                    self.all_sprites.empty()
+                    self.tiles_group.empty()
+                    self.player_group.empty()
             pygame.display.flip()
 
     def level_screen(self):
+        t_start = time.time()
         map = self.maps[self.map_pointer]
         camera = Camera(self.width, self.height)
         self.player = self.generate_level(map)[0]
@@ -172,6 +201,11 @@ class Game:
             arrow_and_not_wall = False
             tiles_types = None
             tiles_collide = None
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_1:
+                    pygame.mixer.music.pause()
+                elif event.key == pygame.K_2:
+                    pygame.mixer.music.unpause()
             if keys[pygame.K_DOWN]:
                 self.player.move("down")
                 tiles_collide = pygame.sprite.spritecollide(self.player, self.tiles_group, False)
@@ -219,6 +253,9 @@ class Game:
                     self.player.kill()
                     for tile in tiles_collide:
                         if tile.tile_type == 'bomb':
+                            sound = pygame.mixer.Sound("data/boom.ogg")
+                            sound.set_volume(0.1)
+                            sound.play()
                             tile.image = tile.tile_images["boom"]
                             self.lose()
                             self.game_over = True
@@ -228,6 +265,7 @@ class Game:
                         if tile.tile_type == 'bomb':
                             tile.image = tile.tile_images["empty"]
                             self.extra_life = False
+                            self.tiles_group.remove(tile)
                 elif 'key' in tiles_types:
                     for tile in tiles_collide:
                         if tile.tile_type == 'key':
@@ -237,13 +275,21 @@ class Game:
                     for tile in tiles_collide:
                         if tile.tile_type == 'coin':
                             tile.image = tile.tile_images["empty"]
+                            sound = pygame.mixer.Sound("data/coin_sounds.ogg")
+                            sound.set_volume(0.1)
+                            sound.play()
                             self.coin_counter += 1
+                            self.tiles_group.remove(tile)
                 elif 'door' in tiles_types and self.key == True:
                     self.key = False
                     self.all_sprites.empty()
                     self.tiles_group.empty()
                     self.player_group.empty()
                     self.map_pointer += 1
+                    self.game_time += time.time() - t_start
+                    sound = pygame.mixer.Sound("data/next_lvl.ogg")
+                    sound.set_volume(0.2)
+                    sound.play()
                     if self.map_pointer == len(self.maps):
                         self.win()
                         self.game_over = True
@@ -253,13 +299,17 @@ class Game:
                         if tile.tile_type == 'extra_life':
                             tile.image = tile.tile_images["empty"]
                             self.extra_life = True
+                            sound = pygame.mixer.Sound("data/extra_life.ogg")
+                            sound.set_volume(0.15)
+                            sound.play()
+                            self.tiles_group.remove(tile)
 
             camera.update(self.player)
             for sprite in self.all_sprites:
                   camera.apply(sprite)
 
             self.render_lvl()
-            clock.tick(200)
+            clock.tick(400)
             pygame.display.flip()
 
     def start_screen(self):
@@ -269,8 +319,8 @@ class Game:
                       "Подобрать ключ и найти дверь.",
                       "При задевании бомбы вы проигрываете.",
                       "Для продолжения нажмите ЛКМ или ПКМ"]
-
-        fon = pygame.transform.scale(load_image('fon.jpg'), (930, 550))
+        # fon size: 2560 / 1440 = x / 600
+        fon = pygame.transform.scale(load_image('fon.jpg'), (1066, 600))
         self.screen.blit(fon, (-200, 0))
         font = pygame.font.Font(None, 30)
         text_coord = 50
@@ -293,10 +343,10 @@ class Game:
 
 class Tile(pygame.sprite.Sprite):
     def __init__(self, tile_type, pos_x, pos_y):
-        self.tile_images = {'wall': load_image('box.png'), 'empty': load_image('grass.png'), 'door': load_image('door.png', -1),
-                       'key': load_image('key.png', -1), 'bomb': load_image('mario_bomb.png', -1), 'boom': load_image('boom.png', -1),
-                       'extra_life': load_image('heart.png', -1), 'coin': load_image('coin3.png', -1)}
-        tile_width = tile_height = 50
+        self.tile_images = {'wall': load_image('big_box.png'), 'empty': load_image('big_grass.png'), 'door': load_image('big_door.png', -1),
+                       'key': load_image('big_key.png', -1), 'bomb': load_image('big_mario_bomb.png', -1), 'boom': load_image('big_boom.png', -1),
+                       'extra_life': load_image('big_heart.png', -1), 'coin': load_image('big_coin3.png', -1)}
+        tile_width = tile_height = 100
         super().__init__()
         self.tile_type = tile_type
         self.image = self.tile_images[self.tile_type]
@@ -305,8 +355,8 @@ class Tile(pygame.sprite.Sprite):
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y):
-        player_image = load_image('mario.png', -1)
-        self.tile_width = self.tile_height = 50
+        player_image = load_image('big_mario.png', -1)
+        self.tile_width = self.tile_height = 100
         super().__init__()
         self.image = player_image
         self.rect = self.image.get_rect().move(self.tile_width * pos_x + 15, self.tile_height * pos_y + 5)
@@ -342,7 +392,7 @@ class Camera:
 
 
 def main(maps_dir):
-    game = Game(300, 300)
+    game = Game(600, 600)
     if os.path.exists("data/" + maps_dir):
         maps = glob("data/" + maps_dir + '/*.txt')
         for i in range(len(maps)):
