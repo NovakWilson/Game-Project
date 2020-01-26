@@ -8,6 +8,7 @@ import math
 
 
 def load_image(name, colorkey=None):
+    # Загрузка изображения.
     fullname = os.path.join('data', name)
     image = pygame.image.load(fullname).convert()
     if colorkey is not None:
@@ -48,6 +49,7 @@ class Game:
         sys.exit()
 
     def generate_level(self, map):
+        # создание карты
         self.load_level(map)
         new_player, x, y = None, None, None
         for y in range(len(self.map)):
@@ -91,6 +93,7 @@ class Game:
         return new_player, x, y
 
     def load_level(self, filename):
+        # чтение и загрузка файла
         filename = "data/" + filename
         # читаем уровень, убирая символы перевода строки
         with open(filename, 'r') as mapFile:
@@ -102,11 +105,13 @@ class Game:
         return self.map
 
     def render_lvl(self):
+        # отрисовка всего уровня
         self.screen.fill((0, 0, 0))
         self.tiles_group.draw(self.screen)
         self.player_group.draw(self.screen)
 
     def lose(self):
+        # Отрисовка экрана поражения
         self.render_lvl()
         running = True
         v = 300
@@ -114,6 +119,7 @@ class Game:
         pause = 1000
         timer = 0
         pygame.mixer.music.load('data/mario_death.mp3')
+        pygame.mixer.music.set_volume(0.2)
         pygame.mixer.music.play()
         x_cord = -600
         y_cord = 0
@@ -135,6 +141,7 @@ class Game:
             pygame.display.flip()
 
     def win(self):
+        # отрисовка экрана при победе
         running = True
         v = 300
         clock = pygame.time.Clock()
@@ -143,6 +150,7 @@ class Game:
         image = load_image('big_win.png')
         self.screen.blit(image, (x_cord, y_cord))
         pygame.mixer.music.load('data/win_sounds.mp3')
+        pygame.mixer.music.set_volume(0.2)
         pygame.mixer.music.play()
         draw_count = True
         self.game_time = math.ceil(self.game_time)
@@ -157,6 +165,7 @@ class Game:
                 else:
                     minute = self.game_time // 60
                     secund = self.game_time % 60
+
                     if minute % 10 == 1 and minute % 100 != 11:
                         minute_teg = 'минуту'
                     elif minute % 10 in [2, 3, 4] and minute % 100 not in [12, 13, 14]:
@@ -170,22 +179,31 @@ class Game:
                         second_teg = 'секунды'
                     else:
                         second_teg = 'секунд'
+
+                    # Статистика прохождения игры:
                     font = pygame.font.Font(None, 50)
+                    # Информация о собранных монетах.
                     text = font.render(str(self.coin_counter) + "/10 Монет собранно", 1, (255, 215, 0))
+                    # Информация о времени прохождения игры.
                     if minute > 0:
                         text_time = font.render('За {} {} и {} {}'.format(minute, minute_teg, secund, second_teg), 1, (255, 215, 0))
                     else:
                         text_time = font.render('За {} {}'.format(secund, second_teg), 1, (255, 215, 0))
                     self.screen.blit(text, (120, 400))
                     self.screen.blit(text_time, (130, 450))
+
                     draw_count = False
                     x_cord = 0
+
+                    # Очискта групп спрайтов
                     self.all_sprites.empty()
                     self.tiles_group.empty()
                     self.player_group.empty()
+
             pygame.display.flip()
 
     def level_screen(self):
+        # Экран уровня
         t_start = time.time()
         map = self.maps[self.map_pointer]
         camera = Camera(self.width, self.height)
@@ -201,11 +219,15 @@ class Game:
             arrow_and_not_wall = False
             tiles_types = None
             tiles_collide = None
+
+            # Работа с фоновой музыкой
             if event.type == pygame.KEYUP:
                 if event.key == pygame.K_1:
                     pygame.mixer.music.pause()
                 elif event.key == pygame.K_2:
                     pygame.mixer.music.unpause()
+
+            # Управление персонажем
             if keys[pygame.K_DOWN]:
                 self.player.move("down")
                 tiles_collide = pygame.sprite.spritecollide(self.player, self.tiles_group, False)
@@ -248,6 +270,7 @@ class Game:
                 else:
                     arrow_and_not_wall = True
 
+            # Проверки на столкновения героя с тайлами
             if arrow_and_not_wall and tiles_collide is not None and tiles_types is not None:
                 if 'bomb' in tiles_types and not self.extra_life:
                     self.player.kill()
@@ -271,6 +294,10 @@ class Game:
                         if tile.tile_type == 'key':
                             tile.image = tile.tile_images["empty"]
                             self.key = True
+                            self.tiles_group.remove(tile)
+                            sound = pygame.mixer.Sound("data/key_sound.ogg")
+                            sound.set_volume(0.4)
+                            sound.play()
                 elif 'coin' in tiles_types:
                     for tile in tiles_collide:
                         if tile.tile_type == 'coin':
@@ -304,6 +331,7 @@ class Game:
                             sound.play()
                             self.tiles_group.remove(tile)
 
+            # Движение камеры
             camera.update(self.player)
             for sprite in self.all_sprites:
                   camera.apply(sprite)
@@ -313,13 +341,14 @@ class Game:
             pygame.display.flip()
 
     def start_screen(self):
+        # Фоновое окно с правилами
         pygame.init()
         intro_text = ["Добро пожаловать в мир Mario!", "",
                       "Правила игры:",
                       "Подобрать ключ и найти дверь.",
                       "При задевании бомбы вы проигрываете.",
                       "Для продолжения нажмите ЛКМ или ПКМ"]
-        # fon size: 2560 / 1440 = x / 600
+        # fon size: 2560 / 1440 = x / 600 (формула для высчитывания размеров фон экрана)
         fon = pygame.transform.scale(load_image('fon.jpg'), (1066, 600))
         self.screen.blit(fon, (-200, 0))
         font = pygame.font.Font(None, 30)
@@ -343,6 +372,7 @@ class Game:
 
 class Tile(pygame.sprite.Sprite):
     def __init__(self, tile_type, pos_x, pos_y):
+        # Работа с тайлами
         self.tile_images = {'wall': load_image('big_box.png'), 'empty': load_image('big_grass.png'), 'door': load_image('big_door.png', -1),
                        'key': load_image('big_key.png', -1), 'bomb': load_image('big_mario_bomb.png', -1), 'boom': load_image('big_boom.png', -1),
                        'extra_life': load_image('big_heart.png', -1), 'coin': load_image('big_coin3.png', -1)}
@@ -355,6 +385,7 @@ class Tile(pygame.sprite.Sprite):
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y):
+        # работа с персонажем
         player_image = load_image('big_mario.png', -1)
         self.tile_width = self.tile_height = 100
         super().__init__()
@@ -362,6 +393,7 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect().move(self.tile_width * pos_x + 15, self.tile_height * pos_y + 5)
 
     def move(self, direction):
+        # перемещение персонажа
         if direction == "up":
             self.rect.y -= 1
         elif direction == "down":
@@ -373,6 +405,7 @@ class Player(pygame.sprite.Sprite):
 
 
 class Camera:
+    # Движение камеры в целом
     # зададим начальный сдвиг камеры
     def __init__(self, width, height):
         self.dx = 0
@@ -393,7 +426,12 @@ class Camera:
 
 def main(maps_dir):
     game = Game(600, 600)
+    # Получение названия файла из командной строки и проверка его наличия в папке Data
     if os.path.exists("data/" + maps_dir):
+        '''
+        С помощью метода glob мы получаем все файлы с расширением txt из папки,
+        находящейся в главной папке Data.
+        '''
         maps = glob("data/" + maps_dir + '/*.txt')
         for i in range(len(maps)):
             maps[i] = maps[i].replace('\\', '/')
@@ -407,6 +445,10 @@ def main(maps_dir):
 
 
 if __name__ == "__main__":
+    '''
+    Получение данных из командной строки.
+    "len(sys.argv)" - длинна введенной строки (sys.argv) является списком данных.
+    '''
     if len(sys.argv) == 2:
         maps_dir_name = sys.argv[1]
         main(maps_dir_name)
