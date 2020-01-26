@@ -21,6 +21,7 @@ def load_image(name, colorkey=None):
 
 
 class Game:
+    # Класс самой игры.
     def __init__(self, width=650, height=550):
         pygame.mixer.pre_init(44100, 16, 2, 4096)
         pygame.init()
@@ -38,6 +39,7 @@ class Game:
         self.game_over = False
         self.key = False
         self.extra_life = False
+        self.extra_life_counter = 1
         self.coin_counter = 0
         self.game_time = 0
         pygame.mixer.music.load('data/main_sounds.mp3')
@@ -110,6 +112,16 @@ class Game:
         self.tiles_group.draw(self.screen)
         self.player_group.draw(self.screen)
 
+        life_image = load_image('heart.png', -1)
+        coin_image = load_image('coin3.png', -1)
+        font = pygame.font.Font(None, 40)
+        life_text = font.render(str(self.extra_life_counter), 1, (255, 255, 51))
+        coin_text = font.render(str(self.coin_counter), 1, (255, 255, 51))
+        self.screen.blit(life_text, (540, 20))
+        self.screen.blit(life_image, (560, 20))
+        self.screen.blit(coin_image, (565, 55))
+        self.screen.blit(coin_text, (540, 60))
+
     def lose(self):
         # Отрисовка экрана поражения
         self.render_lvl()
@@ -181,16 +193,17 @@ class Game:
                         second_teg = 'секунд'
 
                     # Статистика прохождения игры:
-                    font = pygame.font.Font(None, 50)
+                    font = pygame.font.Font(None, 40)
                     # Информация о собранных монетах.
                     text = font.render(str(self.coin_counter) + "/10 Монет собранно", 1, (255, 215, 0))
                     # Информация о времени прохождения игры.
                     if minute > 0:
-                        text_time = font.render('За {} {} и {} {}'.format(minute, minute_teg, secund, second_teg), 1, (255, 215, 0))
+                        text_time = font.render('Игра пройдена за {} {} и {} {}'.format(minute, minute_teg, secund, second_teg), 1, (255, 215, 0))
+                        self.screen.blit(text_time, (40, 370))
                     else:
-                        text_time = font.render('За {} {}'.format(secund, second_teg), 1, (255, 215, 0))
-                    self.screen.blit(text, (120, 400))
-                    self.screen.blit(text_time, (130, 450))
+                        text_time = font.render('Игра пройдена за {} {}'.format(secund, second_teg), 1, (255, 215, 0))
+                        self.screen.blit(text_time, (100, 370))
+                    self.screen.blit(text, (150, 450))
 
                     draw_count = False
                     x_cord = 0
@@ -272,7 +285,7 @@ class Game:
 
             # Проверки на столкновения героя с тайлами
             if arrow_and_not_wall and tiles_collide is not None and tiles_types is not None:
-                if 'bomb' in tiles_types and not self.extra_life:
+                if 'bomb' in tiles_types and self.extra_life_counter == 1:
                     self.player.kill()
                     for tile in tiles_collide:
                         if tile.tile_type == 'bomb':
@@ -283,12 +296,15 @@ class Game:
                             self.lose()
                             self.game_over = True
                             return
-                elif 'bomb' in tiles_types and self.extra_life == True:
+                elif 'bomb' in tiles_types and self.extra_life_counter > 1:
                     for tile in tiles_collide:
                         if tile.tile_type == 'bomb':
                             tile.image = tile.tile_images["empty"]
-                            self.extra_life = False
+                            self.extra_life_counter -= 1
                             self.tiles_group.remove(tile)
+                            sound = pygame.mixer.Sound("data/extra_life.ogg")
+                            sound.set_volume(0.15)
+                            sound.play()
                 elif 'key' in tiles_types:
                     for tile in tiles_collide:
                         if tile.tile_type == 'key':
@@ -325,9 +341,9 @@ class Game:
                     for tile in tiles_collide:
                         if tile.tile_type == 'extra_life':
                             tile.image = tile.tile_images["empty"]
-                            self.extra_life = True
-                            sound = pygame.mixer.Sound("data/extra_life.ogg")
-                            sound.set_volume(0.15)
+                            self.extra_life_counter += 1
+                            sound = pygame.mixer.Sound("data/life_sound.ogg")
+                            sound.set_volume(0.05)
                             sound.play()
                             self.tiles_group.remove(tile)
 
