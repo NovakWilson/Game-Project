@@ -23,6 +23,10 @@ def load_image(name, colorkey=None):
 class Game:
     # Класс самой игры.
     def __init__(self, width=650, height=550):
+        """
+        :param width: ширина экрана
+        :param height: высота экрана
+        """
         pygame.mixer.pre_init(44100, 16, 2, 4096)
         pygame.init()
         pygame.mixer.init()
@@ -42,6 +46,7 @@ class Game:
         self.extra_life_counter = 1
         self.coin_counter = 0
         self.game_time = 0
+        self.max_coin = 0
         pygame.mixer.music.load('data/main_sounds.mp3')
         pygame.mixer.music.play(-1)
         pygame.mixer.music.set_volume(0.05)
@@ -51,6 +56,10 @@ class Game:
         sys.exit()
 
     def generate_level(self, map):
+        """
+        :param map: Путь к текстовому файлу с картой уровня
+        :return: Экземпляр персонажа и его координаты
+        """
         # создание карты
         self.load_level(map)
         new_player, x, y = None, None, None
@@ -73,6 +82,7 @@ class Game:
                     tile = Tile('extra_life', x + 0.15, y + 0.2)
                     tile.add(self.tiles_group, self.all_sprites)
                 elif self.map[y][x] == 'c':
+                    self.max_coin += 1
                     tile = Tile('empty', x, y)
                     tile.add(self.tiles_group, self.all_sprites)
                     tile = Tile('coin', x + 0.2, y + 0.25)
@@ -95,6 +105,10 @@ class Game:
         return new_player, x, y
 
     def load_level(self, filename):
+        """
+        :param filename: Путь к текстовому файлу с картой уровня
+        :return: карта в виде двумерного списка
+        """
         # чтение и загрузка файла
         filename = "data/" + filename
         # читаем уровень, убирая символы перевода строки
@@ -103,7 +117,11 @@ class Game:
         # и подсчитываем максимальную длину
         max_width = max(map(len, level_map))
         # дополняем каждую строку пустыми клетками ('.')
-        self.map = list(map(lambda x: x.ljust(max_width, '.'), level_map))
+        self.map = list(map(lambda x: '..#' + x.ljust(max_width, '.') + '#..', level_map))
+        top = ['.' * (max_width + 6), '.' * (max_width + 6), '..' + '#' * (max_width + 2) + '..']
+        bottom = top[::-1]
+        self.map = top + self.map + bottom
+
         return self.map
 
     def render_lvl(self):
@@ -195,7 +213,7 @@ class Game:
                     # Статистика прохождения игры:
                     font = pygame.font.Font(None, 40)
                     # Информация о собранных монетах.
-                    text = font.render(str(self.coin_counter) + "/10 Монет собранно", 1, (255, 215, 0))
+                    text = font.render(str(self.coin_counter) + "/" + str(self.max_coin) + " Монет собрано", 1, (255, 215, 0))
                     # Информация о времени прохождения игры.
                     if minute > 0:
                         text_time = font.render('Игра пройдена за {} {} и {} {}'.format(minute, minute_teg, secund, second_teg), 1, (255, 215, 0))
@@ -223,26 +241,26 @@ class Game:
         self.player = self.generate_level(map)[0]
         self.render_lvl()
         clock = pygame.time.Clock()
-        look_left = True
         while True:
             keys = pygame.key.get_pressed()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.terminate()
+                # Работа с фоновой музыкой
+                if event.type == pygame.KEYUP:
+                    if event.key == pygame.K_1:
+                        pygame.mixer.music.pause()
+                    elif event.key == pygame.K_2:
+                        pygame.mixer.music.unpause()
             arrow_and_not_wall = False
             tiles_types = None
             tiles_collide = None
 
-            # Работа с фоновой музыкой
-            if event.type == pygame.KEYUP:
-                if event.key == pygame.K_1:
-                    pygame.mixer.music.pause()
-                elif event.key == pygame.K_2:
-                    pygame.mixer.music.unpause()
-
             # Управление персонажем
+
             if keys[pygame.K_DOWN]:
                 self.player.move("down")
+                self.player.image = load_image("big_mario_down.png", -1)
                 tiles_collide = pygame.sprite.spritecollide(self.player, self.tiles_group, False)
                 tiles_types = [tile.tile_type for tile in tiles_collide]
                 if "wall" in tiles_types:
@@ -252,6 +270,7 @@ class Game:
 
             if keys[pygame.K_UP]:
                 self.player.move("up")
+                self.player.image = load_image("mario-up.png", -1)
                 tiles_collide = pygame.sprite.spritecollide(self.player, self.tiles_group, False)
                 tiles_types = [tile.tile_type for tile in tiles_collide]
                 if "wall" in tiles_types:
@@ -261,11 +280,10 @@ class Game:
 
             if keys[pygame.K_RIGHT]:
                 self.player.move("right")
+                self.player.image = load_image("mario-left.png", -1)
+                self.player.image = pygame.transform.flip(self.player.image, True, False)
                 tiles_collide = pygame.sprite.spritecollide(self.player, self.tiles_group, False)
                 tiles_types = [tile.tile_type for tile in tiles_collide]
-                if look_left:
-                    self.player.image = pygame.transform.flip(self.player.image, True, False)
-                    look_left = False
                 if "wall" in tiles_types:
                     self.player.move("left")
                 else:
@@ -273,11 +291,9 @@ class Game:
 
             if keys[pygame.K_LEFT]:
                 self.player.move("left")
+                self.player.image = load_image("mario-left.png", -1)
                 tiles_collide = pygame.sprite.spritecollide(self.player, self.tiles_group, False)
                 tiles_types = [tile.tile_type for tile in tiles_collide]
-                if not look_left:
-                    self.player.image = pygame.transform.flip(self.player.image, True, False)
-                    look_left = True
                 if "wall" in tiles_types:
                     self.player.move("right")
                 else:
@@ -293,6 +309,7 @@ class Game:
                             sound.set_volume(0.1)
                             sound.play()
                             tile.image = tile.tile_images["boom"]
+                            self.extra_life_counter = 0
                             self.lose()
                             self.game_over = True
                             return
@@ -323,7 +340,7 @@ class Game:
                             sound.play()
                             self.coin_counter += 1
                             self.tiles_group.remove(tile)
-                elif 'door' in tiles_types and self.key == True:
+                elif 'door' in tiles_types and self.key:
                     self.key = False
                     self.all_sprites.empty()
                     self.tiles_group.empty()
@@ -350,7 +367,7 @@ class Game:
             # Движение камеры
             camera.update(self.player)
             for sprite in self.all_sprites:
-                  camera.apply(sprite)
+                camera.apply(sprite)
 
             self.render_lvl()
             clock.tick(400)
@@ -388,10 +405,15 @@ class Game:
 
 class Tile(pygame.sprite.Sprite):
     def __init__(self, tile_type, pos_x, pos_y):
+        """
+        :param tile_type: тип тайла ('wall', 'key' и т.д)
+        :param pos_x: координата тайла по X
+        :param pos_y: координата тайла по Y
+        """
         # Работа с тайлами
         self.tile_images = {'wall': load_image('big_box.png'), 'empty': load_image('big_grass.png'), 'door': load_image('big_door.png', -1),
-                       'key': load_image('big_key.png', -1), 'bomb': load_image('big_mario_bomb.png', -1), 'boom': load_image('big_boom.png', -1),
-                       'extra_life': load_image('big_heart.png', -1), 'coin': load_image('big_coin3.png', -1)}
+                            'key': load_image('big_key.png', -1), 'bomb': load_image('big_mario_bomb.png', -1), 'boom': load_image('big_boom.png', -1),
+                            'extra_life': load_image('big_heart.png', -1), 'coin': load_image('big_coin3.png', -1)}
         tile_width = tile_height = 100
         super().__init__()
         self.tile_type = tile_type
@@ -401,14 +423,22 @@ class Tile(pygame.sprite.Sprite):
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y):
+        """
+        :param pos_x: координата тайла игрока по X
+        :param pos_y: координата тайла игрока по Y
+        """
         # работа с персонажем
-        player_image = load_image('big_mario.png', -1)
+        player_image = load_image("big_mario_down.png", -1)
         self.tile_width = self.tile_height = 100
         super().__init__()
         self.image = player_image
         self.rect = self.image.get_rect().move(self.tile_width * pos_x + 15, self.tile_height * pos_y + 5)
 
     def move(self, direction):
+        """
+        :param direction: Направление движения ('up', 'down' и т.д)
+        :return: self object
+        """
         # перемещение персонажа
         if direction == "up":
             self.rect.y -= 1
@@ -418,12 +448,17 @@ class Player(pygame.sprite.Sprite):
             self.rect.x -= 1
         elif direction == "right":
             self.rect.x += 1
+        return self
 
 
 class Camera:
     # Движение камеры в целом
     # зададим начальный сдвиг камеры
     def __init__(self, width, height):
+        """
+        :param width: ширина экрана
+        :param height: высота экрана
+        """
         self.dx = 0
         self.dy = 0
         self.width = width
@@ -431,11 +466,19 @@ class Camera:
 
     # сдвинуть объект obj на смещение камеры
     def apply(self, obj):
+        """
+        :param obj: Объект, который нужно сдвинуть
+        :return: None
+        """
         obj.rect.x += self.dx
         obj.rect.y += self.dy
 
     # позиционировать камеру на объекте target
     def update(self, target):
+        """
+        :param target: Объект, на котором будет фокусироваться камера
+        :return: None
+        """
         self.dx = -(target.rect.x + target.rect.w // 2 - self.width // 2)
         self.dy = -(target.rect.y + target.rect.h // 2 - self.height // 2)
 
